@@ -736,7 +736,7 @@ function TopBar({ title, onBack }) {
           display: "flex",
           alignItems: "center",
         }}
-      >// ---------- Dashboard (staff-facing) ----------
+      // ---------- Dashboard (staff-facing) ----------
 function Dashboard({ bookings, onUpdate, onRemove, onBack }) {
   const [tab, setTab] = useState("today"); // today | upcoming | replies
   const [activeBooking, setActiveBooking] = useState(null);
