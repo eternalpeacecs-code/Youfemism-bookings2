@@ -1021,14 +1021,8 @@ function BlockTimeSheet({ onClose, onSave }) {
     </div>
   );
 }
-        <ArrowLeft size={22} />
-      </button>
-      <h1 style={{ fontFamily: FONT_HEAD, fontSize: 18, fontWeight: 600, color: COLORS.plum, margin: 0 }}>
-        {title}
-      </h1>
-    </div>
-  );
-}function TabBtn({ children, active, onClick, count, flag }) {
+        
+function TabBtn({ children, active, onClick, count, flag }) {
   return (
     <button
       className="tap focusable"
