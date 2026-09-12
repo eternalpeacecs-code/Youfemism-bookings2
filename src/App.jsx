@@ -735,7 +735,15 @@ function TopBar({ title, onBack }) {
           color: COLORS.plum,
           display: "flex",
           alignItems: "center",
-        }}
+        }}>
+        <ArrowLeft size={22} />
+      </button>
+      <h1 style={{ fontFamily: FONT_HEAD, fontSize: 18, fontWeight: 600, color: COLORS.plum, margin: 0 }}>
+        {title}
+      </h1>
+    </div>
+  );
+}
       // ---------- Dashboard (staff-facing) ----------
 function Dashboard({ bookings, onUpdate, onRemove, onBack }) {
   const [tab, setTab] = useState("today"); // today | upcoming | replies
