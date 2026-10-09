@@ -239,10 +239,12 @@ export default function App() {
 
   // ---- Auth (team route only) ----
   const [session, setSession] = useState(undefined); // undefined = not checked yet, null = signed out
+  const [recovery, setRecovery] = useState(false); // true when opened from a "reset password" email link
   useEffect(() => {
     if (!isTeamRoute) return;
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
     const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
+      if (_event === "PASSWORD_RECOVERY") setRecovery(true);
       setSession(sess);
     });
     return () => sub.subscription.unsubscribe();
@@ -342,7 +344,15 @@ export default function App() {
       {view === "dashboard" && isTeamRoute && !isAuthed && session !== undefined && (
         <LoginScreen />
       )}
-      {view === "dashboard" && isTeamRoute && isAuthed && loaded && (
+      {isTeamRoute && isAuthed && recovery && (
+        <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "32px 20px" }}>
+          <div style={{ width: "100%", maxWidth: 320 }}>
+            <h1 style={{ fontFamily: FONT_HEAD, fontSize: 26, fontWeight: 500, color: COLORS.plum, margin: "0 0 8px" }}>Set a new password</h1>
+            <SetPasswordForm onDone={() => setRecovery(false)} />
+          </div>
+        </div>
+      )}
+      {view === "dashboard" && isTeamRoute && isAuthed && !recovery && loaded && (
         <Dashboard
           bookings={bookings}
           onUpdate={updateBooking}
@@ -362,7 +372,22 @@ function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
   const [busy, setBusy] = useState(false);
+
+  async function handleForgot() {
+    setError("");
+    setInfo("");
+    if (!email.trim()) {
+      setError("Type your email above first, then tap Forgot password.");
+      return;
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: window.location.origin + "/team",
+    });
+    if (error) setError("Couldn't send the reset email. Please try again in a few minutes.");
+    else setInfo("Check your email for a link to set a new password.");
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -423,6 +448,14 @@ function LoginScreen() {
           />
         </Field>
         {error && <p style={{ color: "#B23A3A", fontSize: 14, marginTop: -6 }}>{error}</p>}
+        {info && <p style={{ color: COLORS.plum, fontSize: 14, marginTop: -6 }}>{info}</p>}
+        <button
+          type="button"
+          onClick={handleForgot}
+          style={{ background: "transparent", border: "none", color: COLORS.plum, fontSize: 14, fontWeight: 600, padding: "4px 0 12px", textDecoration: "underline" }}
+        >
+          Forgot password?
+        </button>
         <button
           type="submit"
           disabled={busy}
@@ -922,7 +955,53 @@ function IconBtn({ children, onClick, label }) {
   );
 }
 
+function SetPasswordForm({ onDone, onCancel }) {
+  const [pw, setPw] = useState("");
+  const [pw2, setPw2] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e) {
+    e.preventDefault();
+    setError("");
+    if (pw.length < 8) return setError("Please use at least 8 characters.");
+    if (pw !== pw2) return setError("The two passwords don't match.");
+    setBusy(true);
+    const { error } = await supabase.auth.updateUser({ password: pw });
+    setBusy(false);
+    if (error) setError(error.message || "Couldn't save the password. Please try again.");
+    else onDone();
+  }
+
+  return (
+    <form onSubmit={submit}>
+      <Field label="New password">
+        <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} style={inputStyle} autoComplete="new-password" required />
+      </Field>
+      <Field label="Type it again">
+        <input type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} style={inputStyle} autoComplete="new-password" required />
+      </Field>
+      {error && <p style={{ color: "#B23A3A", fontSize: 14, marginTop: -6 }}>{error}</p>}
+      <button
+        type="submit"
+        disabled={busy}
+        className="tap focusable"
+        style={{ width: "100%", background: COLORS.plum, color: COLORS.cream, border: "none", borderRadius: 14, padding: "16px", fontSize: 16, fontWeight: 600, opacity: busy ? 0.7 : 1 }}
+      >
+        {busy ? "Saving…" : "Save password"}
+      </button>
+      {onCancel && (
+        <button type="button" onClick={onCancel} style={{ width: "100%", background: "transparent", border: "none", color: "#6B5D5F", fontSize: 15, padding: "14px 0 0" }}>
+          Cancel
+        </button>
+      )}
+    </form>
+  );
+}
+
 function TopBar({ title, onBack, onSignOut }) {
+  const [showPw, setShowPw] = useState(false);
+  const [pwSaved, setPwSaved] = useState(false);
   return (
     <div
       style={{
@@ -956,6 +1035,15 @@ function TopBar({ title, onBack, onSignOut }) {
       {onSignOut && (
         <button
           className="tap focusable"
+          onClick={() => { setPwSaved(false); setShowPw(true); }}
+          style={{ background: "transparent", border: `1.5px solid ${COLORS.creamDark}`, color: "#6B5D5F", borderRadius: 10, padding: "8px 12px", fontSize: 13, fontWeight: 600 }}
+        >
+          Password
+        </button>
+      )}
+      {onSignOut && (
+        <button
+          className="tap focusable"
           onClick={onSignOut}
           style={{
             background: "transparent",
@@ -969,6 +1057,22 @@ function TopBar({ title, onBack, onSignOut }) {
         >
           Sign out
         </button>
+      )}
+      {showPw && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div style={{ background: COLORS.cream, borderRadius: 16, padding: 24, width: "100%", maxWidth: 340 }}>
+            <h2 style={{ fontFamily: FONT_HEAD, fontSize: 20, fontWeight: 600, color: COLORS.plum, margin: "0 0 16px" }}>
+              {pwSaved ? "Password updated ✓" : "Change your password"}
+            </h2>
+            {pwSaved ? (
+              <button onClick={() => setShowPw(false)} style={{ width: "100%", background: COLORS.plum, color: COLORS.cream, border: "none", borderRadius: 14, padding: 16, fontSize: 16, fontWeight: 600 }}>
+                Done
+              </button>
+            ) : (
+              <SetPasswordForm onDone={() => setPwSaved(true)} onCancel={() => setShowPw(false)} />
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
