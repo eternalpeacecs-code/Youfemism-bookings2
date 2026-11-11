@@ -8,13 +8,20 @@ const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFndWVnbHJqcGdxaWd4ZXJpcHd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkxNzI5MjMsImV4cCI6MjEwNDc0ODkyM30.DZ9CtdmCZ9WrDNka_2eVmKxUrxSj6vAfM5H36-xBYVs";
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Emails the team when a new booking is made
+// Sends the booking to Netlify Forms, which emails the team
 async function notifyTeam({ name, phone, date, time, notes }) {
   try {
-    await fetch("/api/notify-booking", {
+    await fetch("/", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, phone, date, time, notes }),
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        "form-name": "booking",
+        name,
+        phone,
+        date,
+        time,
+        notes: notes || "",
+      }).toString(),
     });
   } catch (err) {
     console.error("Team notification failed", err);
