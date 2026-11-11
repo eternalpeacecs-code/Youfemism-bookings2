@@ -8,6 +8,19 @@ const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFndWVnbHJqcGdxaWd4ZXJpcHd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkxNzI5MjMsImV4cCI6MjEwNDc0ODkyM30.DZ9CtdmCZ9WrDNka_2eVmKxUrxSj6vAfM5H36-xBYVs";
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// Emails the team when a new booking is made
+async function notifyTeam({ name, phone, date, time, notes }) {
+  try {
+    await fetch("/api/notify-booking", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, phone, date, time, notes }),
+    });
+  } catch (err) {
+    console.error("Team notification failed", err);
+  }
+}
+
 // ---------- Style tokens ----------
 const COLORS = {
   plum: "#C61E5A",
@@ -189,6 +202,15 @@ async function insertBooking(booking) {
     manual_flag: !!booking.manualFlag,
   });
   if (error) console.error("insert booking failed", error);
+  else if (!booking.manualFlag) {
+    notifyTeam({
+      name: booking.name,
+      phone: booking.phone,
+      notes: booking.notes,
+      date: fmtDateLong(new Date(booking.date)),
+      time: fmtTime(booking.hour, booking.min),
+    });
+  }
 }async function updateBookingRow(id, patch) {
   const dbPatch = {};
   if ("needsReply" in patch) dbPatch.needs_reply = patch.needsReply;
