@@ -30,6 +30,7 @@ export default async (req: Request) => {
   const apiKey = Netlify.env.get("RESEND_API_KEY")
   const from = Netlify.env.get("FROM_EMAIL")
   const to = Netlify.env.get("TEAM_EMAIL")
+  const calendarEmail = (Netlify.env.get("CALENDAR_EMAIL") || "").trim()
   if (!apiKey || !from || !to) {
     console.error("RESEND_API_KEY, FROM_EMAIL or TEAM_EMAIL is not set")
     return new Response("Email not configured", { status: 500 })
@@ -76,7 +77,7 @@ export default async (req: Request) => {
       `DESCRIPTION:${icsEsc(`Free consultation with ${name}.${phone ? " WhatsApp: " + phone + "." : ""}${notes ? " Notes: " + notes : ""}`)}`,
       "LOCATION:WhatsApp / phone call",
       `ORGANIZER;CN=youFemism Bookings:mailto:${fromEmail}`,
-      `ATTENDEE;CN=Lorraine;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=FALSE:mailto:${to}`,
+      `ATTENDEE;CN=Lorraine;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=FALSE:mailto:${calendarEmail || to}`,
       "STATUS:CONFIRMED",
       "SEQUENCE:0",
       "TRANSP:OPAQUE",
@@ -105,7 +106,7 @@ export default async (req: Request) => {
     },
     body: JSON.stringify({
       from,
-      to: [to],
+      to: calendarEmail && calendarEmail.toLowerCase() !== to.toLowerCase() ? [to, calendarEmail] : [to],
       subject: `New booking: ${name}, ${date} at ${time}`,
       html,
       ...(attachments ? { attachments } : {}),
