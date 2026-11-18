@@ -56,6 +56,12 @@ export default async (req: Request) => {
   const icsEsc = (s: string) =>
     s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n")
   const fromEmail = (from.match(/<([^>]+)>/)?.[1] || from).trim()
+  const waNumber = (() => {
+    let p = phone.replace(/[^\d+]/g, "")
+    if (p.startsWith("0")) p = "27" + p.slice(1)
+    if (p.startsWith("+")) p = p.slice(1)
+    return p
+  })()
   let attachments: { filename: string; content: string; content_type: string }[] | undefined
   const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate)
   if (dm && Number.isInteger(hour) && Number.isInteger(minute)) {
@@ -74,8 +80,19 @@ export default async (req: Request) => {
       `DTSTART:${stamp(start)}`,
       `DTEND:${stamp(end)}`,
       `SUMMARY:${icsEsc(`youFemism consult - ${name}`)}`,
-      `DESCRIPTION:${icsEsc(`Free consultation with ${name}.${phone ? " WhatsApp: " + phone + "." : ""}${notes ? " Notes: " + notes : ""}`)}`,
-      "LOCATION:WhatsApp / phone call",
+      `DESCRIPTION:${icsEsc(
+        [
+          `Name: ${name}`,
+          phone ? `WhatsApp: ${phone}` : "",
+          phone ? `Chat: https://wa.me/${waNumber}` : "",
+          `Date: ${date}`,
+          `Time: ${time}`,
+          notes ? `What they need help with: ${notes}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n")
+      )}`,
+      `LOCATION:${icsEsc(phone ? `WhatsApp ${phone}` : "WhatsApp / phone call")}`,
       `ORGANIZER;CN=youFemism Bookings:mailto:${fromEmail}`,
       `ATTENDEE;CN=Lorraine;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=FALSE:mailto:${calendarEmail || to}`,
       "STATUS:CONFIRMED",
