@@ -19,6 +19,9 @@ export default async (req: Request) => {
   const date = clean(body.date, 100)
   const time = clean(body.time, 50)
   const notes = clean(body.notes, 1000)
+  const isoDate = clean(body.isoDate, 10)
+  const hour = Number(body.hour)
+  const minute = Number(body.minute)
 
   if (!name || !date || !time) {
     return new Response("Missing fields", { status: 400 })
@@ -48,6 +51,52 @@ export default async (req: Request) => {
       <p>Manage bookings on the team dashboard: /team</p>
     </div>`
 
+  // Calendar invite (45 min, South African time = UTC+2) so it lands in the team calendar
+  const icsEsc = (s: string) =>
+    s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n")
+  const fromEmail = (from.match(/<([^>]+)>/)?.[1] || from).trim()
+  let attachments: { filename: string; content: string; content_type: string }[] | undefined
+  const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate)
+  if (dm && Number.isInteger(hour) && Number.isInteger(minute)) {
+    const stamp = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "")
+    const start = new Date(Date.UTC(+dm[1], +dm[2] - 1, +dm[3], hour - 2, minute))
+    const end = new Date(start.getTime() + 45 * 60 * 1000)
+    const ics = [
+      "BEGIN:VCALENDAR",
+      "PRODID:-//youFemism//Bookings//EN",
+      "VERSION:2.0",
+      "CALSCALE:GREGORIAN",
+      "METHOD:REQUEST",
+      "BEGIN:VEVENT",
+      `UID:${crypto.randomUUID()}@booking.youfemism.co.za`,
+      `DTSTAMP:${stamp(new Date())}`,
+      `DTSTART:${stamp(start)}`,
+      `DTEND:${stamp(end)}`,
+      `SUMMARY:${icsEsc(`youFemism consult - ${name}`)}`,
+      `DESCRIPTION:${icsEsc(`Free consultation with ${name}.${phone ? " WhatsApp: " + phone + "." : ""}${notes ? " Notes: " + notes : ""}`)}`,
+      "LOCATION:WhatsApp / phone call",
+      `ORGANIZER;CN=youFemism Bookings:mailto:${fromEmail}`,
+      `ATTENDEE;CN=Lorraine;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=FALSE:mailto:${to}`,
+      "STATUS:CONFIRMED",
+      "SEQUENCE:0",
+      "TRANSP:OPAQUE",
+      "BEGIN:VALARM",
+      "TRIGGER:-PT15M",
+      "ACTION:DISPLAY",
+      "DESCRIPTION:Booking reminder",
+      "END:VALARM",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n")
+    attachments = [
+      {
+        filename: "booking.ics",
+        content: Buffer.from(ics, "utf-8").toString("base64"),
+        content_type: "text/calendar; charset=UTF-8; method=REQUEST",
+      },
+    ]
+  }
+
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -59,6 +108,7 @@ export default async (req: Request) => {
       to: [to],
       subject: `New booking: ${name}, ${date} at ${time}`,
       html,
+      ...(attachments ? { attachments } : {}),
     }),
   })
 
