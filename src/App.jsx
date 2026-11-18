@@ -9,12 +9,12 @@ const SUPABASE_ANON_KEY =
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Emails the team when a new booking is made
-async function notifyTeam({ name, phone, date, time, notes }) {
+async function notifyTeam({ name, phone, date, time, notes, isoDate, hour, minute }) {
   try {
     await fetch("/api/notify-booking", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, phone, date, time, notes }),
+      body: JSON.stringify({ name, phone, date, time, notes, isoDate, hour, minute }),
     });
   } catch (err) {
     console.error("Team notification failed", err);
@@ -209,6 +209,9 @@ async function insertBooking(booking) {
       notes: booking.notes,
       date: fmtDateLong(new Date(booking.date)),
       time: fmtTime(booking.hour, booking.min),
+      isoDate: booking.date,
+      hour: booking.hour,
+      minute: booking.min,
     });
   }
 }async function updateBookingRow(id, patch) {
