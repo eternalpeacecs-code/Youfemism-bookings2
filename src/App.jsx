@@ -907,7 +907,7 @@ function BookingFlow({ bookings, onBook, onDone }) {
               {fmtDateLong(new Date(confirmedBooking.date))} at {fmtTime(confirmedBooking.hour, confirmedBooking.min)}
             </p>
             <p style={{ fontSize: 14, color: "#8A7B7D", marginBottom: 24 }}>
-              Lorraine will WhatsApp you a reminder closer to the time.
+              {confirmedBooking.whatsappOptIn ? "You’ve opted in to WhatsApp appointment updates. We’ll send confirmations and reminders once the messaging service is active." : "Your booking is confirmed. You have not opted in to WhatsApp appointment messages."}
             </p>
             <button
               className="tap focusable"
