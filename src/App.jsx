@@ -200,9 +200,14 @@ async function insertBooking(booking) {
     status: booking.status || "confirmed",
     needs_reply: !!booking.needsReply,
     manual_flag: !!booking.manualFlag,
+    whatsapp_opt_in: !!booking.whatsappOptIn,
+    whatsapp_opt_in_at: booking.whatsappOptIn ? new Date().toISOString() : null,
   });
-  if (error) console.error("insert booking failed", error);
-  else if (!booking.manualFlag) {
+  if (error) {
+    console.error("insert booking failed", error);
+    throw new Error("Your booking could not be saved. Please try again.");
+  }
+  if (!booking.manualFlag) {
     notifyTeam({
       name: booking.name,
       phone: booking.phone,
@@ -631,6 +636,8 @@ function BookingFlow({ bookings, onBook, onDone }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
+  const [whatsappOptIn, setWhatsappOptIn] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [confirmedBooking, setConfirmedBooking] = useState(null);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState({}); // { name: true, phone: true }
@@ -663,7 +670,8 @@ function BookingFlow({ bookings, onBook, onDone }) {
       )
     : [];
 
-  function handleConfirm() {
+  async function handleConfirm() {
+    if (isSaving) return;
     // Basic SA mobile check: digits only (after stripping spaces/+), 9-10 digits long.
     const phoneDigits = phone.replace(/[^\d]/g, "");
     const phoneLooksValid = phoneDigits.length >= 9 && phoneDigits.length <= 11;
@@ -689,6 +697,7 @@ function BookingFlow({ bookings, onBook, onDone }) {
       name: name.trim(),
       phone: phone.trim(),
       notes: notes.trim(),
+      whatsappOptIn,
       date: toKey(selectedDate),
       hour: selectedSlot.h,
       min: selectedSlot.m,
@@ -696,9 +705,17 @@ function BookingFlow({ bookings, onBook, onDone }) {
       needsReply: false,
       createdAt: new Date().toISOString(),
     };
-    onBook(booking);
-    setConfirmedBooking(booking);
-    setStep(4);
+    setIsSaving(true);
+    setError("");
+    try {
+      await onBook(booking);
+      setConfirmedBooking(booking);
+      setStep(4);
+    } catch (err) {
+      setError(err?.message || "Booking failed. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
@@ -848,11 +865,22 @@ function BookingFlow({ bookings, onBook, onDone }) {
               />
             </Field>
 
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 10, margin: "12px 0 18px", fontSize: 13, lineHeight: 1.5, color: COLORS.charcoal, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={whatsappOptIn}
+                onChange={(e) => setWhatsappOptIn(e.target.checked)}
+                style={{ marginTop: 3, width: 18, height: 18, flexShrink: 0, accentColor: COLORS.plum }}
+              />
+              <span>Yes, I'd like to receive WhatsApp messages from Youfemism about my appointment, including my booking confirmation and reminder. This is optional.</span>
+            </label>
+
             {error && <p style={{ color: "#B23A3A", fontSize: 14 }}>{error}</p>}
 
             <button
               className="tap focusable"
               onClick={handleConfirm}
+              disabled={isSaving}
               style={{
                 width: "100%",
                 background: COLORS.plum,
@@ -865,7 +893,7 @@ function BookingFlow({ bookings, onBook, onDone }) {
                 marginTop: 8,
               }}
             >
-              Confirm booking
+              {isSaving ? "Saving your booking..." : "Confirm booking"}
             </button>
           </>
         )}
@@ -893,7 +921,7 @@ function BookingFlow({ bookings, onBook, onDone }) {
               {fmtDateLong(new Date(confirmedBooking.date))} at {fmtTime(confirmedBooking.hour, confirmedBooking.min)}
             </p>
             <p style={{ fontSize: 14, color: "#8A7B7D", marginBottom: 24 }}>
-              Lorraine will WhatsApp you a reminder closer to the time.
+              {confirmedBooking.whatsappOptIn ? "You’ve opted in to WhatsApp appointment updates. We’ll send confirmations and reminders once the messaging service is active." : "Your booking is confirmed. You have not opted in to WhatsApp appointment messages."}
             </p>
             <button
               className="tap focusable"
