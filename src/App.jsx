@@ -203,8 +203,11 @@ async function insertBooking(booking) {
     whatsapp_opt_in: !!booking.whatsappOptIn,
     whatsapp_opt_in_at: booking.whatsappOptIn ? new Date().toISOString() : null,
   });
-  if (error) console.error("insert booking failed", error);
-  else if (!booking.manualFlag) {
+  if (error) {
+    console.error("insert booking failed", error);
+    throw new Error("Your booking could not be saved. Please try again.");
+  }
+  if (!booking.manualFlag) {
     notifyTeam({
       name: booking.name,
       phone: booking.phone,
@@ -634,6 +637,7 @@ function BookingFlow({ bookings, onBook, onDone }) {
   const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
   const [whatsappOptIn, setWhatsappOptIn] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [confirmedBooking, setConfirmedBooking] = useState(null);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState({}); // { name: true, phone: true }
@@ -666,7 +670,8 @@ function BookingFlow({ bookings, onBook, onDone }) {
       )
     : [];
 
-  function handleConfirm() {
+  async function handleConfirm() {
+    if (isSaving) return;
     // Basic SA mobile check: digits only (after stripping spaces/+), 9-10 digits long.
     const phoneDigits = phone.replace(/[^\d]/g, "");
     const phoneLooksValid = phoneDigits.length >= 9 && phoneDigits.length <= 11;
@@ -700,9 +705,17 @@ function BookingFlow({ bookings, onBook, onDone }) {
       needsReply: false,
       createdAt: new Date().toISOString(),
     };
-    onBook(booking);
-    setConfirmedBooking(booking);
-    setStep(4);
+    setIsSaving(true);
+    setError("");
+    try {
+      await onBook(booking);
+      setConfirmedBooking(booking);
+      setStep(4);
+    } catch (err) {
+      setError(err?.message || "Booking failed. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
@@ -867,6 +880,7 @@ function BookingFlow({ bookings, onBook, onDone }) {
             <button
               className="tap focusable"
               onClick={handleConfirm}
+              disabled={isSaving}
               style={{
                 width: "100%",
                 background: COLORS.plum,
@@ -879,7 +893,7 @@ function BookingFlow({ bookings, onBook, onDone }) {
                 marginTop: 8,
               }}
             >
-              Confirm booking
+              {isSaving ? "Saving your booking..." : "Confirm booking"}
             </button>
           </>
         )}
